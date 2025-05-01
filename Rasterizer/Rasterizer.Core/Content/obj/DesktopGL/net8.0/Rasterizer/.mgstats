@@ -1,0 +1,2 @@
+Source File,Dest File,Processor Type,Content Type,Source File Size,Dest File Size,Build Seconds
+"/Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.Core/Content/Fonts/Hud.spritefont","/Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.Core/Content/bin/DesktopGL/Rasterizer/Fonts/Hud.xnb","FontDescriptionProcessor","SpriteFontContent",2744,1071400,0.36623

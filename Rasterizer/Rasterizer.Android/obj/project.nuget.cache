@@ -1,0 +1,14 @@
+{
+  "version": 2,
+  "dgSpecHash": "YbxY8B0gco0=",
+  "success": false,
+  "projectFilePath": "/Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.Android/Rasterizer.Android.csproj",
+  "expectedPackageFiles": [],
+  "logs": [
+    {
+      "code": "NU1012",
+      "level": "Error",
+      "message": "Platform version is not present for one or more target frameworks, even though they have specified a platform: net8.0-android"
+    }
+  ]
+}

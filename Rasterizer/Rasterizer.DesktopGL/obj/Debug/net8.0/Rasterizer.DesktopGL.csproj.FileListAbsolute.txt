@@ -34,3 +34,4 @@
 /Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.DesktopGL/obj/Debug/net8.0/Rasterizer.pdb
 /Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.DesktopGL/obj/Debug/net8.0/Rasterizer.DesktopGL.genruntimeconfig.cache
 /Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.DesktopGL/obj/Debug/net8.0/ref/Rasterizer.dll
+/Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.DesktopGL/obj/Debug/net8.0/Rasterizer.DesktopGL.sourcelink.json

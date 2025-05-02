@@ -20,3 +20,4 @@
 /Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.Core/obj/Debug/net8.0/refint/Rasterizer.Core.dll
 /Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.Core/obj/Debug/net8.0/Rasterizer.Core.pdb
 /Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.Core/obj/Debug/net8.0/ref/Rasterizer.Core.dll
+/Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.Core/obj/Debug/net8.0/Rasterizer.Core.sourcelink.json

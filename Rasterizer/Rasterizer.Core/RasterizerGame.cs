@@ -3,6 +3,7 @@ using Rasterizer.Core.Localization;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
+using System.Linq;
 using System.Runtime.InteropServices.Marshalling;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
@@ -95,7 +96,7 @@ namespace Rasterizer.Core
 
             // Apply your rasterization logic / pixel manipulation here
             // ...
-    
+            DrawShadedTriangle(new Vector2(10,15), new Vector2(100,20),new Vector2(30,300),Color.Green, [0,0.5,0]);
             // Copy the CPU-side pixel data to the GPU texture (1 call per frame).
             _pixelTexture.SetData(_pixelBuffer);
 
@@ -142,7 +143,7 @@ namespace Rasterizer.Core
                     (pointA, pointB) = (pointB, pointA);
                 }
                 double[] values = RasterizerLogic.Interpolate(pointA.X, pointA.Y,pointB.X, pointB.Y);
-                for (int x = (int)double.Round(pointA.X); x <= (int)double.Round(pointB.X); x++)
+                for (int x = (int)double.Round(pointA.X); x < (int)double.Round(pointB.X); x++)
                 {
                     WriteToPixel(x, (int)double.Round(values[(int)double.Round(x-pointA.X)]), c);
                 }
@@ -154,12 +155,111 @@ namespace Rasterizer.Core
                     (pointA, pointB) = (pointB, pointA);
                 }
                 double[] values = RasterizerLogic.Interpolate(pointA.Y, pointA.X,pointB.Y, pointB.X);
-                for (int y = (int)double.Round(pointA.Y); y <= (int)double.Round(pointB.Y); y++)
+                for (int y = (int)double.Round(pointA.Y); y < (int)double.Round(pointB.Y); y++)
                 {
                     WriteToPixel((int)double.Round(values[(int)double.Round(y-pointA.Y)]), y, c);
                 }
             }
         }
 
+        public void DrawWireframeTriangle(Vector2 pointA, Vector2 pointB, Vector2 pointC, Color c)
+        {
+            DrawLine(pointA, pointB, c);
+            DrawLine(pointB, pointC, c);
+            DrawLine(pointC, pointA, c);
+        }
+        public void DrawTriangle(Vector2 pointA, Vector2 pointB, Vector2 pointC, Color c)
+        {
+            if (pointB.Y < pointA.Y) { (pointA, pointB) = (pointB, pointA); }
+            if (pointC.Y < pointA.Y) { (pointA, pointC) = (pointC, pointA); }
+            if (pointC.Y < pointB.Y) { (pointC, pointB) = (pointB, pointC); }
+            double[] values01 = RasterizerLogic.Interpolate(pointA.Y, pointA.X, pointB.Y, pointB.X).SkipLast(1).ToArray();
+            double[] values12 = RasterizerLogic.Interpolate(pointB.Y, pointB.X, pointC.Y, pointC.X);
+            double[] values02 = RasterizerLogic.Interpolate(pointA.Y, pointA.X, pointC.Y, pointC.X);
+            double[] values012 = values01.Concat(values12).ToArray();
+            int m = (int)Math.Floor((double)values02.Length / 2);
+            double[] xLeft;
+            double[] xRight;
+            if (values02[m] < values012[m])
+            {
+                xLeft = values02;
+                xRight = values012;
+            }
+            else
+            {
+                xLeft = values012;
+                xRight = values02;
+            }
+
+            for (double y = pointA.Y; y < pointC.Y; y++)
+            {
+                for (double x = xLeft[(int)Math.Floor(y-pointA.Y)]; x < xRight[(int)Math.Floor(y-pointA.Y)]; x++)
+                {
+                    WriteToPixel((int)Math.Round(x),(int)Math.Round(y),c);
+                }
+            }
+        }
+
+        public void DrawShadedTriangle(Vector2 pointA, Vector2 pointB, Vector2 pointC, Color c, double[] hs)
+        {
+            if (pointB.Y < pointA.Y)
+            {
+                (pointA, pointB) = (pointB, pointA);
+                (hs[0], hs[1]) = (hs[1], hs[0]);
+            }
+
+            if (pointC.Y < pointA.Y)
+            {
+                (pointA, pointC) = (pointC, pointA);
+                (hs[0], hs[2]) = (hs[2], hs[0]);
+            }
+
+            if (pointC.Y < pointB.Y)
+            {
+                (pointC, pointB) = (pointB, pointC); 
+                (hs[2], hs[1]) = (hs[1], hs[2]);
+            }
+            double[] values01 = RasterizerLogic.Interpolate(pointA.Y, pointA.X, pointB.Y, pointB.X).SkipLast(1).ToArray();
+            double[] hValues01 = RasterizerLogic.Interpolate(pointA.Y, hs[0], pointB.Y, hs[1]).SkipLast(1).ToArray();
+            
+            double[] values12 = RasterizerLogic.Interpolate(pointB.Y, pointB.X, pointC.Y, pointC.X);
+            double[] hValues12 = RasterizerLogic.Interpolate(pointB.Y, hs[1], pointC.Y, hs[2]);
+            
+            double[] values02 = RasterizerLogic.Interpolate(pointA.Y, pointA.X, pointC.Y, pointC.X);
+            double[] hValues02 = RasterizerLogic.Interpolate(pointA.Y, hs[0], pointC.Y, hs[2]);
+            
+            double[] values012 = values01.Concat(values12).ToArray();
+            double[] hValues012 = hValues01.Concat(hValues12).ToArray();
+            
+            int m = (int)Math.Floor((double)values02.Length / 2);
+            double[] xLeft;
+            double[] hLeft;
+            double[] xRight;
+            double[] hRight;
+            if (values02[m] < values012[m])
+            {
+                xLeft = values02;
+                hLeft = hValues02;
+                xRight = values012;
+                hRight = hValues012;
+            }
+            else
+            {
+                xLeft = values012;
+                hLeft = hValues012;
+                xRight = values02;
+                hRight = hValues02;
+            }
+
+            for (double y = pointA.Y; y < pointC.Y; y++)
+            {
+                double[] hSegment = RasterizerLogic.Interpolate(xLeft[(int)Math.Round(y-pointA.Y)],hLeft[(int)Math.Round(y-pointA.Y)],xRight[(int)Math.Round(y-pointA.Y)], hRight[(int)Math.Round(y-pointA.Y)]);
+                for (double x = xLeft[(int)Math.Floor(y-pointA.Y)]; x < xRight[(int)Math.Floor(y-pointA.Y)]; x++)
+                {
+                    double h = hSegment[(int)Math.Round(x-xLeft[(int)Math.Round(y-pointA.Y)])];
+                    WriteToPixel((int)Math.Round(x),(int)Math.Round(y),new Color((float)(c.R/255f * h),(float)(c.G/255f * h),(float)(c.B/255f * h)));
+                }
+            }
+        }
     }
 }

@@ -18,8 +18,10 @@ namespace Rasterizer.Core
     public class RasterizerGame : Game
     {
         // Resources for drawing.
+        private Instance CUBE;
         private GraphicsDeviceManager graphicsDeviceManager;
         private SpriteBatch _spriteBatch;
+        public Dictionary<string, Model> Models = new Dictionary<string, Model>();
         /// <summary>
         /// Indicates if the game is running on a mobile platform.
         /// </summary>
@@ -70,6 +72,32 @@ namespace Rasterizer.Core
             _spriteBatch = new SpriteBatch(GraphicsDevice);
             _pixelTexture = new Texture2D(GraphicsDevice, PixelWidth, PixelHeight);
             _pixelBuffer = new Color[PixelWidth * PixelHeight];
+            Models.Add("Cube", new Model(new Vector3[]
+            {
+                new Vector3(1,  1,  1),
+                new Vector3(-1,  1,  1),
+                new Vector3(-1, -1, 1),
+                new Vector3(1, -1, 1),
+                new Vector3(1, 1, -1),
+                new Vector3(-1, 1, -1),
+                new Vector3(-1, -1, -1),
+                new Vector3(1, -1, -1)
+            }, new int[][]
+            {
+                [0,1,2],
+                [0,2,3],
+                [4,0,3],
+                [4,3,7],
+                [5,4,7],
+                [5,7,6],
+                [1,5,6],
+                [1,6,2],
+                [4,5,1],
+                [4,1,0],
+                [2,6,7],
+                [2,7,3]
+            }));
+            CUBE = new Instance(new Vector3(-1.5f, 0, 7), Quaternion.Identity, 1, Models["Cube"], Color.White);
         }
 
         /// <summary>
@@ -96,30 +124,7 @@ namespace Rasterizer.Core
                     _pixelBuffer[index] = Color.Black;
                 }
             }
-            Vector3[] cube = new Vector3[8];
-            cube[0] = new Vector3(-2, -0.5f, 5);
-            cube[1] = new Vector3(-2, 0.5f, 5);
-            cube[2] = new Vector3(-1, 0.5f, 5);
-            cube[3] = new Vector3(-1, -0.5f, 5);
-            cube[4] = new Vector3(-2, -0.5f, 6);
-            cube[5] = new Vector3(-2, 0.5f, 6);
-            cube[6] = new Vector3(-1, 0.5f, 6);
-            cube[7] = new Vector3(-1, -0.5f, 6);
-            
-            Draw3DLine(cube[0],cube[1], Color.Blue);
-            Draw3DLine(cube[1],cube[2], Color.Blue);
-            Draw3DLine(cube[2],cube[3], Color.Blue);
-            Draw3DLine(cube[3], cube[0],Color.Blue);
-            
-            Draw3DLine(cube[4],cube[5], Color.Red);
-            Draw3DLine(cube[5],cube[6], Color.Red);
-            Draw3DLine(cube[6],cube[7], Color.Red);
-            Draw3DLine(cube[7], cube[4],Color.Red);
-            
-            Draw3DLine(cube[0],cube[4], Color.Green);
-            Draw3DLine(cube[1],cube[5], Color.Green);
-            Draw3DLine(cube[2],cube[6], Color.Green);
-            Draw3DLine(cube[3], cube[7],Color.Green);
+            RenderInstance(CUBE);
             // Apply your rasterization logic / pixel manipulation here
             // ...
             
@@ -301,9 +306,18 @@ namespace Rasterizer.Core
             return ViewportToCanvas(new Vector2(pos.X * distanceOfViewport/ pos.Z, pos.Y * distanceOfViewport/ pos.Z));
         }
 
-        public void Draw3DLine(Vector3 start, Vector3 end, Color color)
+        public void RenderInstance(Instance instance)
         {
-            DrawLine(ProjectVertex(start), ProjectVertex(end), color);
+            Vector2[] projected = new Vector2[instance.Model.Vertices.Length];
+            for (int i = 0; i < instance.Model.Vertices.Length; i++)
+            {
+                projected[i] = ProjectVertex(instance.Model.Vertices[i] + instance.Pos);
+            }
+
+            foreach (int[] triangle in instance.Model.Triangles)
+            {
+                DrawWireframeTriangle(projected[triangle[0]], projected[triangle[1]], projected[triangle[2]], instance.C);
+            }
         }
     }
 }

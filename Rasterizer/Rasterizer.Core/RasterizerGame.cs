@@ -36,11 +36,14 @@ namespace Rasterizer.Core
         /// initializes services like settings and leaderboard managers, and sets up the 
         /// screen manager for screen transitions.
         /// </summary>
-        
+        private const int ViewportWidth = 1;
+
+        private const int distanceOfViewport = 1;
+        private const int ViewportHeight = 1;
         private Texture2D _pixelTexture;
         private Color[] _pixelBuffer;
         private const int PixelWidth = 640;
-        private const int PixelHeight = 400;
+        private const int PixelHeight = 640;
         public RasterizerGame()
         {
             graphicsDeviceManager = new GraphicsDeviceManager(this);
@@ -93,10 +96,33 @@ namespace Rasterizer.Core
                     _pixelBuffer[index] = Color.Black;
                 }
             }
-
+            Vector3[] cube = new Vector3[8];
+            cube[0] = new Vector3(-2, -0.5f, 5);
+            cube[1] = new Vector3(-2, 0.5f, 5);
+            cube[2] = new Vector3(-1, 0.5f, 5);
+            cube[3] = new Vector3(-1, -0.5f, 5);
+            cube[4] = new Vector3(-2, -0.5f, 6);
+            cube[5] = new Vector3(-2, 0.5f, 6);
+            cube[6] = new Vector3(-1, 0.5f, 6);
+            cube[7] = new Vector3(-1, -0.5f, 6);
+            
+            Draw3DLine(cube[0],cube[1], Color.Blue);
+            Draw3DLine(cube[1],cube[2], Color.Blue);
+            Draw3DLine(cube[2],cube[3], Color.Blue);
+            Draw3DLine(cube[3], cube[0],Color.Blue);
+            
+            Draw3DLine(cube[4],cube[5], Color.Red);
+            Draw3DLine(cube[5],cube[6], Color.Red);
+            Draw3DLine(cube[6],cube[7], Color.Red);
+            Draw3DLine(cube[7], cube[4],Color.Red);
+            
+            Draw3DLine(cube[0],cube[4], Color.Green);
+            Draw3DLine(cube[1],cube[5], Color.Green);
+            Draw3DLine(cube[2],cube[6], Color.Green);
+            Draw3DLine(cube[3], cube[7],Color.Green);
             // Apply your rasterization logic / pixel manipulation here
             // ...
-            DrawShadedTriangle(new Vector2(10,15), new Vector2(100,20),new Vector2(30,300),Color.Green, [0,0.5,0]);
+            
             // Copy the CPU-side pixel data to the GPU texture (1 call per frame).
             _pixelTexture.SetData(_pixelBuffer);
 
@@ -126,7 +152,9 @@ namespace Rasterizer.Core
 
         public void WriteToPixel(int x, int y, Color c)
         {
-            _pixelBuffer[y * PixelWidth + x] = c;
+            int y1 = y + PixelHeight / 2;
+            int x1 = x + PixelWidth / 2;
+            _pixelBuffer[y1 * PixelWidth + x1] = c;
         }
 
         public void WriteToPixel(Vector2 v, Color c)
@@ -161,13 +189,14 @@ namespace Rasterizer.Core
                 }
             }
         }
-
+        
         public void DrawWireframeTriangle(Vector2 pointA, Vector2 pointB, Vector2 pointC, Color c)
         {
             DrawLine(pointA, pointB, c);
             DrawLine(pointB, pointC, c);
             DrawLine(pointC, pointA, c);
         }
+        
         public void DrawTriangle(Vector2 pointA, Vector2 pointB, Vector2 pointC, Color c)
         {
             if (pointB.Y < pointA.Y) { (pointA, pointB) = (pointB, pointA); }
@@ -260,6 +289,21 @@ namespace Rasterizer.Core
                     WriteToPixel((int)Math.Round(x),(int)Math.Round(y),new Color((float)(c.R/255f * h),(float)(c.G/255f * h),(float)(c.B/255f * h)));
                 }
             }
+        }
+
+        public Vector2 ViewportToCanvas(Vector2 pos)
+        {
+            return new Vector2(pos.X * PixelWidth / ViewportWidth, pos.Y * PixelHeight / ViewportHeight);
+        }
+
+        public Vector2 ProjectVertex(Vector3 pos)
+        {
+            return ViewportToCanvas(new Vector2(pos.X * distanceOfViewport/ pos.Z, pos.Y * distanceOfViewport/ pos.Z));
+        }
+
+        public void Draw3DLine(Vector3 start, Vector3 end, Color color)
+        {
+            DrawLine(ProjectVertex(start), ProjectVertex(end), color);
         }
     }
 }

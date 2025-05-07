@@ -4,6 +4,7 @@ namespace Rasterizer.Core;
 
 public static class RasterizerLogic
 {
+    
     private const double Epsilon = 0.0001;
     public static double[] Interpolate(double i0, double d0, double i1, double d1)
     {

@@ -5,12 +5,12 @@ namespace Rasterizer.Core;
 public class Instance
 {
     public Model Model;
-    public Vector3 Pos;
+    public Vector4 Pos;
     public Quaternion Rot;
     public double Scale;
     public Color C;
 
-    public Instance(Vector3 pos, Quaternion rot, double scale, Model model, Color c)
+    public Instance(Vector4 pos, Quaternion rot, double scale, Model model, Color c)
     {
         this.Model = model;
         this.Pos = pos;

@@ -5,9 +5,13 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Runtime.InteropServices.Marshalling;
+using Microsoft.VisualBasic.CompilerServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Quaternion = Microsoft.Xna.Framework.Quaternion;
+using Vector2 = Microsoft.Xna.Framework.Vector2;
+using Vector4 = Microsoft.Xna.Framework.Vector4;
 
 namespace Rasterizer.Core
 {
@@ -21,6 +25,8 @@ namespace Rasterizer.Core
         private Instance CUBE;
         private GraphicsDeviceManager graphicsDeviceManager;
         private SpriteBatch _spriteBatch;
+        private Quaternion _cameraRotation = Quaternion.Identity;
+        private Vector4 _cameraPosition = new Vector4(0,0,0,1);
         public Dictionary<string, Model> Models = new Dictionary<string, Model>();
         /// <summary>
         /// Indicates if the game is running on a mobile platform.
@@ -38,14 +44,15 @@ namespace Rasterizer.Core
         /// initializes services like settings and leaderboard managers, and sets up the 
         /// screen manager for screen transitions.
         /// </summary>
-        private const int ViewportWidth = 1;
-
-        private const int distanceOfViewport = 1;
-        private const int ViewportHeight = 1;
+        private const float ViewportWidth = 1;
+        private const float DistanceOfViewport = 1;
+        private const float ViewportHeight = 1;
         private Texture2D _pixelTexture;
         private Color[] _pixelBuffer;
         private const int PixelWidth = 640;
         private const int PixelHeight = 640;
+        private Matrix _cameraMatrix = Matrix.Identity;
+        private Matrix _projectionMatrix = Matrix.Identity;
         public RasterizerGame()
         {
             graphicsDeviceManager = new GraphicsDeviceManager(this);
@@ -72,16 +79,16 @@ namespace Rasterizer.Core
             _spriteBatch = new SpriteBatch(GraphicsDevice);
             _pixelTexture = new Texture2D(GraphicsDevice, PixelWidth, PixelHeight);
             _pixelBuffer = new Color[PixelWidth * PixelHeight];
-            Models.Add("Cube", new Model(new Vector3[]
+            Models.Add("Cube", new Model(new Vector4[]
             {
-                new Vector3(1,  1,  1),
-                new Vector3(-1,  1,  1),
-                new Vector3(-1, -1, 1),
-                new Vector3(1, -1, 1),
-                new Vector3(1, 1, -1),
-                new Vector3(-1, 1, -1),
-                new Vector3(-1, -1, -1),
-                new Vector3(1, -1, -1)
+                new Vector4(1,  1,  1, 1),
+                new Vector4(-1,  1,  1, 1),
+                new Vector4(-1, -1, 1, 1),
+                new Vector4(1, -1, 1, 1),
+                new Vector4(1, 1, -1, 1),
+                new Vector4(-1, 1, -1, 1),
+                new Vector4(-1, -1, -1, 1),
+                new Vector4(1, -1, -1,1)
             }, new int[][]
             {
                 [0,1,2],
@@ -97,7 +104,10 @@ namespace Rasterizer.Core
                 [2,6,7],
                 [2,7,3]
             }));
-            CUBE = new Instance(new Vector3(-1.5f, 0, 7), Quaternion.Identity, 1, Models["Cube"], Color.White);
+            _projectionMatrix[0, 0] = DistanceOfViewport * PixelWidth / ViewportWidth;
+            _projectionMatrix[1, 1] = DistanceOfViewport * PixelHeight / ViewportHeight;
+            _projectionMatrix[3, 3] = 0;
+            CUBE = new Instance(new Vector4(-1.5f, 0, 7, 1), Quaternion.Identity, 1, Models["Cube"], Color.White);
         }
 
         /// <summary>
@@ -111,7 +121,12 @@ namespace Rasterizer.Core
         /// Provides a snapshot of timing values used for game updates.
         /// </param>
         protected override void Update(GameTime gameTime)
-        {
+        {   
+            Matrix cameraTransform = Matrix.Identity;
+            cameraTransform[0, 3] = _cameraPosition.X;
+            cameraTransform[1, 3] = _cameraPosition.Y;
+            cameraTransform[2, 3] = _cameraPosition.Z;
+            _cameraMatrix = Matrix.Invert(Matrix.CreateFromQuaternion(_cameraRotation)) * Matrix.Invert(cameraTransform);
             // Exit the game if the Back button (GamePad) or Escape key (Keyboard) is pressed.
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed
                 || Keyboard.GetState().IsKeyDown(Keys.Escape))
@@ -124,6 +139,9 @@ namespace Rasterizer.Core
                     _pixelBuffer[index] = Color.Black;
                 }
             }
+            float deltaAngle = 0.001f * gameTime.ElapsedGameTime.Milliseconds;
+            Quaternion increment = Quaternion.CreateFromAxisAngle(Vector3.UnitX, deltaAngle);
+            CUBE.Rot = Quaternion.Normalize(Quaternion.Concatenate(CUBE.Rot, increment));
             RenderInstance(CUBE);
             // Apply your rasterization logic / pixel manipulation here
             // ...
@@ -159,7 +177,10 @@ namespace Rasterizer.Core
         {
             int y1 = y + PixelHeight / 2;
             int x1 = x + PixelWidth / 2;
-            _pixelBuffer[y1 * PixelWidth + x1] = c;
+            if (y > -1 * PixelHeight / 2 & y < PixelHeight/2 & x > -1 * PixelWidth / 2 & x < PixelWidth/2  )
+            {
+                _pixelBuffer[y1 * PixelWidth + x1] = c;
+            }
         }
 
         public void WriteToPixel(Vector2 v, Color c)
@@ -303,17 +324,20 @@ namespace Rasterizer.Core
 
         public Vector2 ProjectVertex(Vector3 pos)
         {
-            return ViewportToCanvas(new Vector2(pos.X * distanceOfViewport/ pos.Z, pos.Y * distanceOfViewport/ pos.Z));
+            return ViewportToCanvas(new Vector2(pos.X * DistanceOfViewport/ pos.Z, pos.Y * DistanceOfViewport/ pos.Z));
         }
 
         public void RenderInstance(Instance instance)
         {
+            Matrix instanceTransform = Matrix.CreateScale((float)instance.Scale) * Matrix.CreateFromQuaternion(instance.Rot) * Matrix.CreateTranslation(instance.Pos.X,instance.Pos.Y,instance.Pos.Z);
             Vector2[] projected = new Vector2[instance.Model.Vertices.Length];
             for (int i = 0; i < instance.Model.Vertices.Length; i++)
             {
-                projected[i] = ProjectVertex(instance.Model.Vertices[i] + instance.Pos);
+                Vector4 v = Vector4.Transform(instance.Model.Vertices[i], instanceTransform);
+                v = Vector4.Transform(v, _cameraMatrix);
+                projected[i] = ProjectVertex(new Vector3(v.X/v.W, v.Y/v.W, v.Z/v.W));
             }
-
+            
             foreach (int[] triangle in instance.Model.Triangles)
             {
                 DrawWireframeTriangle(projected[triangle[0]], projected[triangle[1]], projected[triangle[2]], instance.C);

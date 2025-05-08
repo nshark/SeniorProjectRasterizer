@@ -2,6 +2,19 @@
   "version": 3,
   "targets": {
     "net8.0": {
+      "MathNet.Numerics/6.0.0-beta2": {
+        "type": "package",
+        "compile": {
+          "lib/net8.0/MathNet.Numerics.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net8.0/MathNet.Numerics.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "MonoGame.Framework.DesktopGL/3.8.3": {
         "type": "package",
         "dependencies": {
@@ -123,6 +136,26 @@
     }
   },
   "libraries": {
+    "MathNet.Numerics/6.0.0-beta2": {
+      "sha512": "ew55vr5MqCEokG0jRsndoRSPNxdDvSgGwhWyxEFhzc8EuGn3TNtSGKRppCcpHnwXtjFiUvFBN+BBo75yrdKOrQ==",
+      "type": "package",
+      "path": "mathnet.numerics/6.0.0-beta2",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "icon.png",
+        "lib/net48/MathNet.Numerics.dll",
+        "lib/net48/MathNet.Numerics.xml",
+        "lib/net6.0/MathNet.Numerics.dll",
+        "lib/net6.0/MathNet.Numerics.xml",
+        "lib/net8.0/MathNet.Numerics.dll",
+        "lib/net8.0/MathNet.Numerics.xml",
+        "lib/netstandard2.0/MathNet.Numerics.dll",
+        "lib/netstandard2.0/MathNet.Numerics.xml",
+        "mathnet.numerics.6.0.0-beta2.nupkg.sha512",
+        "mathnet.numerics.nuspec"
+      ]
+    },
     "MonoGame.Framework.DesktopGL/3.8.3": {
       "sha512": "cuyMJrK6fHD13J3gqkSx5yF3agbI9E9sXtynhq6IDmUnvi43PTfbLEH04MStDzJJ3OPGaKDW1zcxqA/G8GwOUw==",
       "type": "package",
@@ -264,6 +297,7 @@
   },
   "projectFileDependencyGroups": {
     "net8.0": [
+      "MathNet.Numerics >= 6.0.0-beta2",
       "MonoGame.Framework.DesktopGL >= 3.8.*"
     ]
   },
@@ -309,6 +343,10 @@
       "net8.0": {
         "targetAlias": "net8.0",
         "dependencies": {
+          "MathNet.Numerics": {
+            "target": "Package",
+            "version": "[6.0.0-beta2, )"
+          },
           "MonoGame.Framework.DesktopGL": {
             "suppressParent": "All",
             "target": "Package",

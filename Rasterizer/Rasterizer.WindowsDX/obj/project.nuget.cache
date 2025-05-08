@@ -1,9 +1,10 @@
 {
   "version": 2,
-  "dgSpecHash": "DRbl1aVdapM=",
+  "dgSpecHash": "9lTqDUi9kzg=",
   "success": true,
   "projectFilePath": "/Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.WindowsDX/Rasterizer.WindowsDX.csproj",
   "expectedPackageFiles": [
+    "/Users/noah/.nuget/packages/mathnet.numerics/6.0.0-beta2/mathnet.numerics.6.0.0-beta2.nupkg.sha512",
     "/Users/noah/.nuget/packages/microsoft.netcore.app/2.1.30/microsoft.netcore.app.2.1.30.nupkg.sha512",
     "/Users/noah/.nuget/packages/microsoft.netcore.dotnetapphost/2.1.30/microsoft.netcore.dotnetapphost.2.1.30.nupkg.sha512",
     "/Users/noah/.nuget/packages/microsoft.netcore.dotnethostpolicy/2.1.30/microsoft.netcore.dotnethostpolicy.2.1.30.nupkg.sha512",

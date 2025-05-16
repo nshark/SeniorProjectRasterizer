@@ -22,6 +22,7 @@ namespace Rasterizer.Core
     public class RasterizerGame : Game
     {
         // Resources for drawing.
+        
         private Instance CUBE;
         private GraphicsDeviceManager graphicsDeviceManager;
         private SpriteBatch _spriteBatch;
@@ -44,15 +45,26 @@ namespace Rasterizer.Core
         /// initializes services like settings and leaderboard managers, and sets up the 
         /// screen manager for screen transitions.
         /// </summary>
-        private const float ViewportWidth = 1;
+        private const float ViewportWidth = 2;
         private const float DistanceOfViewport = 1;
-        private const float ViewportHeight = 1;
+        private const float ViewportHeight = 2;
         private Texture2D _pixelTexture;
         private Color[] _pixelBuffer;
         private const int PixelWidth = 640;
         private const int PixelHeight = 640;
         private Matrix _cameraMatrix = Matrix.Identity;
         private Matrix _projectionMatrix = Matrix.Identity;
+
+        private Vector3[] _cameraPlanesVectors = new Vector3[]
+        {
+            new Vector3(0,0,1),
+            new Vector3(1, 0, 1),
+            new Vector3(-1, 0, 1),
+            new Vector3(0, 1, 1),
+            new Vector3(0, -1, 1)
+        };
+
+        private Plane[] _cameraPlanes = new Plane[5];
         public RasterizerGame()
         {
             graphicsDeviceManager = new GraphicsDeviceManager(this);
@@ -76,6 +88,18 @@ namespace Rasterizer.Core
         protected override void LoadContent()
         {
             base.LoadContent();
+            for (int i = 0; i < 5; i++)
+            {
+                _cameraPlanesVectors[i].Normalize();
+                if (i==0)
+                {
+                    _cameraPlanes[i] = new Plane(_cameraPlanesVectors[i], -DistanceOfViewport);
+                }
+                else
+                {
+                    _cameraPlanes[i] = new Plane(_cameraPlanesVectors[i], 0);
+                }
+            }
             _spriteBatch = new SpriteBatch(GraphicsDevice);
             _pixelTexture = new Texture2D(GraphicsDevice, PixelWidth, PixelHeight);
             _pixelBuffer = new Color[PixelWidth * PixelHeight];
@@ -103,11 +127,11 @@ namespace Rasterizer.Core
                 [4,1,0],
                 [2,6,7],
                 [2,7,3]
-            }));
+            }, double.Sqrt(2)));
             _projectionMatrix[0, 0] = DistanceOfViewport * PixelWidth / ViewportWidth;
             _projectionMatrix[1, 1] = DistanceOfViewport * PixelHeight / ViewportHeight;
             _projectionMatrix[3, 3] = 0;
-            CUBE = new Instance(new Vector4(-1.5f, 0, 7, 1), Quaternion.Identity, 1, Models["Cube"], Color.White);
+            CUBE = new Instance(new Vector4(0, -1,1, 1), Quaternion.Identity, 1, Models["Cube"], Color.White);
         }
 
         /// <summary>
@@ -139,9 +163,10 @@ namespace Rasterizer.Core
                     _pixelBuffer[index] = Color.Black;
                 }
             }
-            float deltaAngle = 0.001f * gameTime.ElapsedGameTime.Milliseconds;
-            Quaternion increment = Quaternion.CreateFromAxisAngle(Vector3.UnitX, deltaAngle);
-            CUBE.Rot = Quaternion.Normalize(Quaternion.Concatenate(CUBE.Rot, increment));
+            //float deltaAngle = 0.0001f * gameTime.ElapsedGameTime.Milliseconds;
+            //Quaternion increment = Quaternion.CreateFromAxisAngle(Vector3.UnitX, deltaAngle);
+            //_cameraRotation = Quaternion.Normalize(Quaternion.Concatenate(_cameraRotation, increment));
+            //CUBE.Pos += new Vector4(0, 0, -(float)0.001*gameTime.ElapsedGameTime.Milliseconds, 0);
             RenderInstance(CUBE);
             // Apply your rasterization logic / pixel manipulation here
             // ...
@@ -330,18 +355,182 @@ namespace Rasterizer.Core
         public void RenderInstance(Instance instance)
         {
             Matrix instanceTransform = Matrix.CreateScale((float)instance.Scale) * Matrix.CreateFromQuaternion(instance.Rot) * Matrix.CreateTranslation(instance.Pos.X,instance.Pos.Y,instance.Pos.Z);
-            Vector2[] projected = new Vector2[instance.Model.Vertices.Length];
-            for (int i = 0; i < instance.Model.Vertices.Length; i++)
+            var (projected, triangles) = ClipTriangles(instance, instanceTransform);
+            if (projected == null || triangles == null)
             {
-                Vector4 v = Vector4.Transform(instance.Model.Vertices[i], instanceTransform);
-                v = Vector4.Transform(v, _cameraMatrix);
-                projected[i] = ProjectVertex(new Vector3(v.X/v.W, v.Y/v.W, v.Z/v.W));
+                return;
             }
-            
-            foreach (int[] triangle in instance.Model.Triangles)
+            foreach (int[] triangle in triangles)
             {
                 DrawWireframeTriangle(projected[triangle[0]], projected[triangle[1]], projected[triangle[2]], instance.C);
             }
+        }
+
+        public (Vector2[], int[][]) ClipTriangles(Instance instance, Matrix instanceTransform)
+        {
+            var vertices = new System.Collections.Generic.List<Vector4>();
+            int[][] triangles = new int[instance.Model.Triangles.Length][];
+            instance.Model.Triangles.CopyTo(triangles,0);
+            foreach (var t in instance.Model.Vertices)
+            {
+                vertices.Add(Vector4.Transform(t,instanceTransform*_cameraMatrix));
+            }
+            foreach (var plane in _cameraPlanes)
+            {
+                double signedDistance = RasterizerLogic.SignedDistance(Vector4.Transform(instance.Pos,_cameraMatrix), plane);
+                if (instance.Model.Radius > signedDistance)
+                {
+                    if (instance.Model.Radius + signedDistance > 0)
+                    {
+                        var temp = new int[triangles.Length][];
+                        triangles.CopyTo(temp,0);
+                        foreach (var triangle in temp)
+                        {
+                            (vertices, triangles) = ClipTriangleAgainstPlane(triangle,vertices,triangles, plane);
+                            if (vertices == null || triangles == null)
+                            {
+                                return (null, null);
+                            }
+                        }
+                        
+                    }
+                    else
+                    {
+                        return (null, null);
+                    }
+                }
+            }
+            Vector2[] result = new Vector2[vertices.Count()];
+            for (int i = 0; i < vertices.Count(); i++)
+            {
+                result[i] = ProjectVertex(new Vector3(vertices[i].X/vertices[i].W, vertices[i].Y/vertices[i].W, vertices[i].Z/vertices[i].W));
+            }
+            return (result, triangles);
+        }
+
+        public (List<Vector4>, int[][]) ClipTriangleAgainstPlane(int[] triangle, List<Vector4> vertices, int[][] triangles, Plane plane)
+        {
+            List<int[]> triangleList = new List<int[]>();
+            double d0 = RasterizerLogic.SignedDistance(vertices[triangle[0]], plane);
+            double d1 = RasterizerLogic.SignedDistance(vertices[triangle[1]], plane);
+            double d2 = RasterizerLogic.SignedDistance(vertices[triangle[2]], plane);
+            if (d0 <= 0 && d1 <= 0 && d2 <= 0)
+            {
+                foreach (var tri in triangles)
+                {
+                    if (!tri.Equals( triangle))
+                    {
+                        triangleList.Add(tri);
+                    }
+                }
+                return (vertices, triangleList.ToArray());
+            }
+
+            int NumAbove0 = 0;
+            if (d0>=0)
+            {
+                NumAbove0++;
+            }
+
+            if (d1>=0)
+            {
+                NumAbove0++;
+            }
+
+            if (d2 >= 0 )
+            {
+                NumAbove0++;
+            }
+
+            if (NumAbove0 == 3)
+            {
+                return (vertices, triangles);
+            }
+
+            Vector3 v0 = new Vector3(vertices[triangle[0]].X/vertices[triangle[0]].W, vertices[triangle[0]].Y/vertices[triangle[0]].W, vertices[triangle[0]].Z/vertices[triangle[0]].W);
+            Vector3 v1 = new Vector3(vertices[triangle[1]].X/vertices[triangle[1]].W, vertices[triangle[1]].Y/vertices[triangle[1]].W, vertices[triangle[1]].Z/vertices[triangle[1]].W);
+            Vector3 v2 = new Vector3(vertices[triangle[2]].X/vertices[triangle[2]].W, vertices[triangle[2]].Y/vertices[triangle[2]].W, vertices[triangle[2]].Z/vertices[triangle[2]].W);
+            
+            if (NumAbove0 == 2)
+            {
+                foreach (var tri in triangles)
+                {
+                    if (!tri.Equals( triangle))
+                    {
+                        triangleList.Add(tri);
+                    }
+                }
+                if (d0 < 0)
+                {
+                    vertices.Add(RasterizerLogic.Intersect(v0,v1,plane));
+                    vertices.Add(RasterizerLogic.Intersect(v0,v2,plane));
+                    triangleList.Add(new int[]{
+                        triangle[1], vertices.Count - 2, triangle[2]
+                    });
+                    triangleList.Add(new int[]{
+                        triangle[2], vertices.Count - 2, vertices.Count - 1
+                    });
+                    return (vertices, triangleList.ToArray());
+                }
+                if (d1 < 0)
+                {
+                    vertices.Add(RasterizerLogic.Intersect(v1,v0,plane));
+                    vertices.Add(RasterizerLogic.Intersect(v1,v2,plane));
+                    triangleList.Add(new int[]{
+                        triangle[0], vertices.Count - 2, triangle[2]
+                    });
+                    triangleList.Add(new int[]{
+                        triangle[2], vertices.Count - 2, vertices.Count - 1
+                    });
+                    return (vertices, triangleList.ToArray());
+                }
+                if (d2 < 0)
+                {
+                    vertices.Add(RasterizerLogic.Intersect(v2,v0,plane));
+                    vertices.Add(RasterizerLogic.Intersect(v2,v1,plane));
+                    triangleList.Add(new int[]{
+                        triangle[0], vertices.Count - 2, triangle[1]
+                    });
+                    triangleList.Add(new int[]{
+                        triangle[1], vertices.Count - 2, vertices.Count - 1
+                    });
+                    return (vertices, triangleList.ToArray());
+                }
+            }
+
+            if (NumAbove0 == 1)
+            {
+                
+                foreach (var tri in triangles)
+                {
+                    if (!tri.Equals( triangle))
+                    {
+                        triangleList.Add(tri);
+                    }
+                }
+                if (d0 >= 0)
+                {
+                    vertices.Add(RasterizerLogic.Intersect(v0,v1,plane));
+                    vertices.Add(RasterizerLogic.Intersect(v0,v2,plane));
+                    triangleList.Add(new int[]{triangle[0], vertices.Count - 2, vertices.Count() - 1});
+                    return (vertices, triangleList.ToArray());
+                }
+                if (d1 >= 0)
+                {
+                    vertices.Add(RasterizerLogic.Intersect(v1,v0,plane));
+                    vertices.Add(RasterizerLogic.Intersect(v1,v2,plane));
+                    triangleList.Add(new int[]{triangle[1], vertices.Count - 2, vertices.Count() - 1});
+                    return (vertices, triangleList.ToArray());
+                }
+                if (d2 >= 0)
+                {
+                    vertices.Add(RasterizerLogic.Intersect(v2,v1,plane));
+                    vertices.Add(RasterizerLogic.Intersect(v2,v0,plane));
+                    triangleList.Add(new int[]{triangle[2], vertices.Count - 2, vertices.Count() - 1});
+                    return (vertices, triangleList.ToArray());
+                }
+            }
+            return (null, null);
         }
     }
 }

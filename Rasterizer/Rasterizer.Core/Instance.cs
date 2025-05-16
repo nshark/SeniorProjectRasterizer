@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Microsoft.Xna.Framework;
 
 namespace Rasterizer.Core;
@@ -17,5 +18,10 @@ public class Instance
         this.Rot = rot;
         this.Scale = scale;
         this.C = c;
+    }
+
+    public double getRadius()
+    {
+        return Model.Radius * Scale;
     }
 }

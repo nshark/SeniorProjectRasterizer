@@ -58,4 +58,16 @@ public static class RasterizerLogic
     {
         return Math.Abs(a - b) < Epsilon;
     }
+
+    public static double SignedDistance(Vector4 v, Plane plane)
+    {
+        return v.X * plane.Normal.X + v.Y * plane.Normal.Y + v.Z * plane.Normal.Z + plane.D;
+    }
+
+    public static Vector4 Intersect(Vector3 a, Vector3 b, Plane plane)
+    {
+        float t = (-plane.D - Vector3.Dot(plane.Normal, a))/Vector3.Dot(plane.Normal, b - a);
+        Vector3 b_a = new Vector3(a.X+t*(b.X-a.X), a.Y+t*(b.Y-a.Y), a.Z+t*(b.Z-a.Z));
+        return new Vector4(b_a, 1);
+    }
 }

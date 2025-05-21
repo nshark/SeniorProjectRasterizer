@@ -45,23 +45,23 @@ namespace Rasterizer.Core
         /// initializes services like settings and leaderboard managers, and sets up the 
         /// screen manager for screen transitions.
         /// </summary>
-        private const float ViewportWidth = 2;
+        private const float ViewportWidth = 1;
         private const float DistanceOfViewport = 1;
-        private const float ViewportHeight = 2;
+        private const float ViewportHeight = 1;
         private Texture2D _pixelTexture;
         private Color[] _pixelBuffer;
         private const int PixelWidth = 640;
         private const int PixelHeight = 640;
         private Matrix _cameraMatrix = Matrix.Identity;
         private Matrix _projectionMatrix = Matrix.Identity;
-
+        private double[][] _depthBuffer;
         private Vector3[] _cameraPlanesVectors = new Vector3[]
         {
             new Vector3(0,0,1),
-            new Vector3(1, 0, 1),
-            new Vector3(-1, 0, 1),
-            new Vector3(0, 1, 1),
-            new Vector3(0, -1, 1)
+            new Vector3(1, 0, 0.5f),
+            new Vector3(-1, 0, 0.5f),
+            new Vector3(0, 1, 0.5f),
+            new Vector3(0, -1, 0.5f)
         };
 
         private Plane[] _cameraPlanes = new Plane[5];
@@ -103,6 +103,11 @@ namespace Rasterizer.Core
             _spriteBatch = new SpriteBatch(GraphicsDevice);
             _pixelTexture = new Texture2D(GraphicsDevice, PixelWidth, PixelHeight);
             _pixelBuffer = new Color[PixelWidth * PixelHeight];
+            _depthBuffer = new double[PixelWidth][];
+            for (int i = 0; i < PixelWidth; i++)
+            {
+                _depthBuffer[i] = new double[PixelHeight];
+            }
             Models.Add("Cube", new Model(new Vector4[]
             {
                 new Vector4(1,  1,  1, 1),
@@ -131,7 +136,7 @@ namespace Rasterizer.Core
             _projectionMatrix[0, 0] = DistanceOfViewport * PixelWidth / ViewportWidth;
             _projectionMatrix[1, 1] = DistanceOfViewport * PixelHeight / ViewportHeight;
             _projectionMatrix[3, 3] = 0;
-            CUBE = new Instance(new Vector4(0, -1,1, 1), Quaternion.Identity, 1, Models["Cube"], Color.White);
+            CUBE = new Instance(new Vector4(-1, 2,7, 1), Quaternion.Identity, 1, Models["Cube"], Color.White);
         }
 
         /// <summary>
@@ -161,12 +166,13 @@ namespace Rasterizer.Core
                 {
                     int index = y * PixelWidth + x;
                     _pixelBuffer[index] = Color.Black;
+                    _depthBuffer[x][y] = Double.MaxValue;
                 }
             }
-            //float deltaAngle = 0.0001f * gameTime.ElapsedGameTime.Milliseconds;
+            //float deltaAngle = 0.001f * gameTime.ElapsedGameTime.Milliseconds;
             //Quaternion increment = Quaternion.CreateFromAxisAngle(Vector3.UnitX, deltaAngle);
-            //_cameraRotation = Quaternion.Normalize(Quaternion.Concatenate(_cameraRotation, increment));
-            //CUBE.Pos += new Vector4(0, 0, -(float)0.001*gameTime.ElapsedGameTime.Milliseconds, 0);
+            //CUBE.Rot = Quaternion.Normalize(Quaternion.Concatenate(CUBE.Rot, increment));
+            CUBE.Pos += new Vector4(0, 0, -(float)0.001*gameTime.ElapsedGameTime.Milliseconds, 0);
             RenderInstance(CUBE);
             // Apply your rasterization logic / pixel manipulation here
             // ...
@@ -280,7 +286,7 @@ namespace Rasterizer.Core
             }
         }
 
-        public void DrawShadedTriangle(Vector2 pointA, Vector2 pointB, Vector2 pointC, Color c, double[] hs)
+        public void DrawVisibleTriangle(Vector2 pointA, Vector2 pointB, Vector2 pointC, Color c, double[] hs)
         {
             if (pointB.Y < pointA.Y)
             {
@@ -336,8 +342,16 @@ namespace Rasterizer.Core
                 double[] hSegment = RasterizerLogic.Interpolate(xLeft[(int)Math.Round(y-pointA.Y)],hLeft[(int)Math.Round(y-pointA.Y)],xRight[(int)Math.Round(y-pointA.Y)], hRight[(int)Math.Round(y-pointA.Y)]);
                 for (double x = xLeft[(int)Math.Floor(y-pointA.Y)]; x < xRight[(int)Math.Floor(y-pointA.Y)]; x++)
                 {
-                    double h = hSegment[(int)Math.Round(x-xLeft[(int)Math.Round(y-pointA.Y)])];
-                    WriteToPixel((int)Math.Round(x),(int)Math.Round(y),new Color((float)(c.R/255f * h),(float)(c.G/255f * h),(float)(c.B/255f * h)));
+                    double z = hSegment[(int)Math.Round(x-xLeft[(int)Math.Round(y-pointA.Y)])];
+                    if (y > -1 * PixelHeight / 2 & y < PixelHeight/2 & x > -1 * PixelWidth / 2 & x < PixelWidth/2  )
+                    {
+                        if (z < _depthBuffer[(int)Math.Floor(x + PixelWidth/2)][(int)Math.Floor(y + PixelHeight/2)])
+                        {
+                            WriteToPixel((int)Math.Round(x),(int)Math.Round(y), c);
+                            _depthBuffer[(int)Math.Floor(x + PixelWidth/2)][(int)Math.Floor(y + PixelHeight/2)] = z;
+                        }
+                    }
+                    
                 }
             }
         }
@@ -347,26 +361,31 @@ namespace Rasterizer.Core
             return new Vector2(pos.X * PixelWidth / ViewportWidth, pos.Y * PixelHeight / ViewportHeight);
         }
 
-        public Vector2 ProjectVertex(Vector3 pos)
+        public (Vector2, double) ProjectVertex(Vector3 pos)
         {
-            return ViewportToCanvas(new Vector2(pos.X * DistanceOfViewport/ pos.Z, pos.Y * DistanceOfViewport/ pos.Z));
+            return (ViewportToCanvas(new Vector2(pos.X * DistanceOfViewport/ pos.Z, pos.Y * DistanceOfViewport/ pos.Z)), pos.Z);
         }
 
         public void RenderInstance(Instance instance)
         {
             Matrix instanceTransform = Matrix.CreateScale((float)instance.Scale) * Matrix.CreateFromQuaternion(instance.Rot) * Matrix.CreateTranslation(instance.Pos.X,instance.Pos.Y,instance.Pos.Z);
-            var (projected, triangles) = ClipTriangles(instance, instanceTransform);
+            var (projected, depthBuffer, triangles) = ClipTriangles(instance, instanceTransform);
             if (projected == null || triangles == null)
             {
                 return;
             }
             foreach (int[] triangle in triangles)
             {
-                DrawWireframeTriangle(projected[triangle[0]], projected[triangle[1]], projected[triangle[2]], instance.C);
+                DrawVisibleTriangle(projected[triangle[0]], projected[triangle[1]], projected[triangle[2]], instance.C, new double[]{
+                    depthBuffer[triangle[0]],
+                    depthBuffer[triangle[1]],
+                    depthBuffer[triangle[2]]
+                });
+                DrawWireframeTriangle(projected[triangle[0]], projected[triangle[1]], projected[triangle[2]],Color.Red);
             }
         }
 
-        public (Vector2[], int[][]) ClipTriangles(Instance instance, Matrix instanceTransform)
+        public (Vector2[], double[], int[][]) ClipTriangles(Instance instance, Matrix instanceTransform)
         {
             var vertices = new System.Collections.Generic.List<Vector4>();
             int[][] triangles = new int[instance.Model.Triangles.Length][];
@@ -389,23 +408,25 @@ namespace Rasterizer.Core
                             (vertices, triangles) = ClipTriangleAgainstPlane(triangle,vertices,triangles, plane);
                             if (vertices == null || triangles == null)
                             {
-                                return (null, null);
+                                return (null, null, null);
                             }
                         }
                         
                     }
                     else
                     {
-                        return (null, null);
+                        return (null, null, null);
                     }
                 }
             }
             Vector2[] result = new Vector2[vertices.Count()];
+            double[] depthBuffer = new double[vertices.Count()];
             for (int i = 0; i < vertices.Count(); i++)
             {
-                result[i] = ProjectVertex(new Vector3(vertices[i].X/vertices[i].W, vertices[i].Y/vertices[i].W, vertices[i].Z/vertices[i].W));
+                (result[i],depthBuffer[i]) = ProjectVertex(new Vector3(vertices[i].X/vertices[i].W, vertices[i].Y/vertices[i].W, vertices[i].Z/vertices[i].W));
             }
-            return (result, triangles);
+
+            return (result, depthBuffer, triangles);
         }
 
         public (List<Vector4>, int[][]) ClipTriangleAgainstPlane(int[] triangle, List<Vector4> vertices, int[][] triangles, Plane plane)
@@ -426,23 +447,23 @@ namespace Rasterizer.Core
                 return (vertices, triangleList.ToArray());
             }
 
-            int NumAbove0 = 0;
+            int numAbove0 = 0;
             if (d0>=0)
             {
-                NumAbove0++;
+                numAbove0++;
             }
 
             if (d1>=0)
             {
-                NumAbove0++;
+                numAbove0++;
             }
 
             if (d2 >= 0 )
             {
-                NumAbove0++;
+                numAbove0++;
             }
 
-            if (NumAbove0 == 3)
+            if (numAbove0 == 3)
             {
                 return (vertices, triangles);
             }
@@ -451,7 +472,7 @@ namespace Rasterizer.Core
             Vector3 v1 = new Vector3(vertices[triangle[1]].X/vertices[triangle[1]].W, vertices[triangle[1]].Y/vertices[triangle[1]].W, vertices[triangle[1]].Z/vertices[triangle[1]].W);
             Vector3 v2 = new Vector3(vertices[triangle[2]].X/vertices[triangle[2]].W, vertices[triangle[2]].Y/vertices[triangle[2]].W, vertices[triangle[2]].Z/vertices[triangle[2]].W);
             
-            if (NumAbove0 == 2)
+            if (numAbove0 == 2)
             {
                 foreach (var tri in triangles)
                 {
@@ -498,7 +519,7 @@ namespace Rasterizer.Core
                 }
             }
 
-            if (NumAbove0 == 1)
+            if (numAbove0 == 1)
             {
                 
                 foreach (var tri in triangles)

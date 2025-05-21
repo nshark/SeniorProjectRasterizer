@@ -43,7 +43,7 @@ public static class RasterizerLogic
         int o0 = (int)Math.Floor(i0);
         int o1 = (int)Math.Floor(i1);
         if (o1 == o0) { return [d0]; }
-        double[] values = new double[o1 - o0+1];
+        double[] values = new double[Math.Abs(o1 - o0+1)];
         double a = (d1 - d0) / (i1 - i0);
         double d = d0;
         for (int i = o0; i < o1+1; i++)
@@ -66,8 +66,9 @@ public static class RasterizerLogic
 
     public static Vector4 Intersect(Vector3 a, Vector3 b, Plane plane)
     {
-        float t = (-plane.D - Vector3.Dot(plane.Normal, a))/Vector3.Dot(plane.Normal, b - a);
-        Vector3 b_a = new Vector3(a.X+t*(b.X-a.X), a.Y+t*(b.Y-a.Y), a.Z+t*(b.Z-a.Z));
-        return new Vector4(b_a, 1);
+        Vector3 b_a = new Vector3(b.X-a.X, b.Y-a.Y, b.Z-a.Z);
+        float t = (-plane.D - Vector3.Dot(plane.Normal, a))/Vector3.Dot(plane.Normal, b_a);
+        Vector3 result = new Vector3(a.X+t*(b.X-a.X), a.Y+t*(b.Y-a.Y), a.Z+t*(b.Z-a.Z));
+        return new Vector4(result, 1);
     }
 }

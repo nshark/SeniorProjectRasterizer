@@ -136,7 +136,7 @@ namespace Rasterizer.Core
             _projectionMatrix[0, 0] = DistanceOfViewport * PixelWidth / ViewportWidth;
             _projectionMatrix[1, 1] = DistanceOfViewport * PixelHeight / ViewportHeight;
             _projectionMatrix[3, 3] = 0;
-            CUBE = new Instance(new Vector4(-1, 2,7, 1), Quaternion.Identity, 1, Models["Cube"], Color.White);
+            CUBE = new Instance(new Vector4(-1, 2,7, 1), Quaternion.Identity, 1, Models["Cube"], Color.White, 1);
         }
 
         /// <summary>

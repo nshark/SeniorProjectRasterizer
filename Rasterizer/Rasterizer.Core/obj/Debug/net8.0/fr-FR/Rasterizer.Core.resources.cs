@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Rasterizer.Core")]
 [assembly: System.Reflection.AssemblyCopyrightAttribute(" ")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8d5467a4e07ff751e3731f2960b212107538432a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+50676f2223605c0abfbfd70a3b1e3e393fcb6813")]
 [assembly: System.Reflection.AssemblyProductAttribute("Rasterizer.Core")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Rasterizer.Core")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

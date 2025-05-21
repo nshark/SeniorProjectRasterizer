@@ -336,22 +336,41 @@ namespace Rasterizer.Core
                 xRight = values02;
                 hRight = hValues02;
             }
+            int yMin = (int)Math.Ceiling(pointA.Y);
+            int yMax = (int)Math.Floor (pointC.Y);
 
-            for (double y = pointA.Y; y < pointC.Y; y++)
+            for (int y = yMin; y <= yMax; ++y)                        // inclusive
             {
-                double[] hSegment = RasterizerLogic.Interpolate(xLeft[(int)Math.Round(y-pointA.Y)],hLeft[(int)Math.Round(y-pointA.Y)],xRight[(int)Math.Round(y-pointA.Y)], hRight[(int)Math.Round(y-pointA.Y)]);
-                for (double x = xLeft[(int)Math.Floor(y-pointA.Y)]; x < xRight[(int)Math.Floor(y-pointA.Y)]; x++)
+                /* index into the pre-computed edge arrays */
+                int yIndex = y - (int)Math.Round(pointA.Y);
+
+                /* 1/w values for this scan line (needed for the depth test) */
+                double[] hSegment = RasterizerLogic.Interpolate(
+                    xLeft [yIndex],  hLeft [yIndex],
+                    xRight[yIndex],  hRight[yIndex]);
+
+                /* integer span of the current scan line, inclusive */
+                int xl = (int)Math.Ceiling(xLeft [yIndex]);
+                int xr = (int)Math.Floor (xRight[yIndex]);
+
+                for (int x = xl; x <= xr; ++x)                         // inclusive
                 {
-                    double z = hSegment[(int)Math.Round(x-xLeft[(int)Math.Round(y-pointA.Y)])];
-                    if (y > -1 * PixelHeight / 2 & y < PixelHeight/2 & x > -1 * PixelWidth / 2 & x < PixelWidth/2  )
+                    double z = 1.0 / hSegment[x - xl];
+
+                    /* clip against the render target */
+                    if (y > -PixelHeight / 2 && y < PixelHeight / 2 &&
+                        x > -PixelWidth  / 2 && x < PixelWidth  / 2)
                     {
-                        if (z < _depthBuffer[(int)Math.Floor(x + PixelWidth/2)][(int)Math.Floor(y + PixelHeight/2)])
+                        int bufX = x + PixelWidth  / 2;
+                        int bufY = y + PixelHeight / 2;
+
+                        /* depth test */
+                        if (z < _depthBuffer[bufX][bufY])
                         {
-                            WriteToPixel((int)Math.Round(x),(int)Math.Round(y), c);
-                            _depthBuffer[(int)Math.Floor(x + PixelWidth/2)][(int)Math.Floor(y + PixelHeight/2)] = z;
+                            WriteToPixel(x, y, c);
+                            _depthBuffer[bufX][bufY] = z;
                         }
                     }
-                    
                 }
             }
         }
@@ -381,7 +400,6 @@ namespace Rasterizer.Core
                     depthBuffer[triangle[1]],
                     depthBuffer[triangle[2]]
                 });
-                DrawWireframeTriangle(projected[triangle[0]], projected[triangle[1]], projected[triangle[2]],Color.Red);
             }
         }
 

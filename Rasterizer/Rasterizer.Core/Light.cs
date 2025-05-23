@@ -10,7 +10,7 @@ public class Light
     {
         Intensity = intensity;
     }
-    public double computeLightingOnPoint(Vector3 p, Vector3 normal, double specular)
+    public virtual double computeLightingOnPoint(Vector3 p, Vector3 normal, double specular, Vector4 cameraPos, Matrix cameraMatrix)
     {
         return Intensity;
     }

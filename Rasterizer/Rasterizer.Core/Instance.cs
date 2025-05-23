@@ -11,7 +11,7 @@ public class Instance(Vector4 pos, Quaternion rot, double scale, Model model, Co
     public double Scale = scale;
     public Color C = c;
     public double Specular = specular;
-
+    
     public double getRadius()
     {
         return Model.Radius * Scale;

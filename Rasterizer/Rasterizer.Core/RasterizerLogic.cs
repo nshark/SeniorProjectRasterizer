@@ -21,7 +21,7 @@ public static class RasterizerLogic
             d += a;
         }
 
-        values[values.Length - 1] = d1;
+        values[^1] = d1;
         return values;
     }
 
@@ -41,5 +41,32 @@ public static class RasterizerLogic
         float t = (-plane.D - Vector3.Dot(plane.Normal, a))/Vector3.Dot(plane.Normal, b_a);
         Vector3 result = new Vector3(a.X+t*(b.X-a.X), a.Y+t*(b.Y-a.Y), a.Z+t*(b.Z-a.Z));
         return new Vector4(result, 1);
+    }
+    public static Vector3 ComputeNormal(Vector3 v1, Vector3 v2, Vector3 v3)
+    {
+        // Calculate the two edge vectors
+        Vector3 edge1 = v2 - v1;
+        Vector3 edge2 = v3 - v1;
+
+        // Calculate the cross product of the two edges
+        Vector3 crossProduct = Vector3.Cross(edge1, edge2);
+
+        // Normalize the resulting vector to ensure it is a unit vector
+        Vector3 normal = Vector3.Normalize(crossProduct);
+
+        return normal;
+    }
+    public static Color ScaleColor(Color color, float intensity)
+    {
+        // Ensure intensity is clamped between 0 and 1
+        intensity = MathHelper.Clamp(intensity, 0.0f, 1.0f);
+
+        // Scale each component by the intensity
+        byte r = (byte)(color.R * intensity);
+        byte g = (byte)(color.G * intensity);
+        byte b = (byte)(color.B * intensity);
+        byte a = color.A; // You might or might not want to scale alpha
+
+        return new Color(r, g, b, a);
     }
 }

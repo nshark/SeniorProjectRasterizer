@@ -21,7 +21,7 @@ public class DirectionalLight : Light
             i += Intensity * nDotL/(normal.Length() * _direction.Length());
         }
 
-        if (RasterizerLogic.EpsilonCompare(specular, -1))
+        if (Math.Abs(specular + 1) < RasterizerLogic.Epsilon)
         {
             Vector3 r = Vector3.Reflect(_direction, normal);
             float rDotV = Vector3.Dot(r, v);

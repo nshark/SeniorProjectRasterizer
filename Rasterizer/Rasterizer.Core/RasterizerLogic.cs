@@ -6,12 +6,18 @@ namespace Rasterizer.Core;
 
 public static class RasterizerLogic
 {
-    private const double Epsilon = 0.0001;
+    public const double Epsilon = 0.0001;
     public static double[] Interpolate(double i0, double d0, double i1, double d1)
     {
         int o0 = (int)Math.Floor(i0);
         int o1 = (int)Math.Ceiling(i1);
         if (EpsilonCompare(i0,i1)) { return [d0]; }
+
+        if (i0 > i1)
+        {
+            return Interpolate(i1, d1, i0, d0);
+        }
+
         double[] values = new double[Math.Abs(o1 - o0)+1];
         double a = (d1 - d0) / (i1 - i0);
         double d = d0;

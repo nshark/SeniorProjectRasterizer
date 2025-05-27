@@ -9,6 +9,7 @@ using Microsoft.VisualBasic.CompilerServices;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
+using Point = System.Drawing.Point;
 using Quaternion = Microsoft.Xna.Framework.Quaternion;
 using Vector2 = Microsoft.Xna.Framework.Vector2;
 using Vector4 = Microsoft.Xna.Framework.Vector4;
@@ -24,6 +25,7 @@ namespace Rasterizer.Core
         // Resources for drawing.
         
         private Instance CUBE;
+        private Instance CUBE_2;
         private GraphicsDeviceManager graphicsDeviceManager;
         private SpriteBatch _spriteBatch;
         private Quaternion _cameraRotation = Quaternion.Identity;
@@ -55,7 +57,7 @@ namespace Rasterizer.Core
         private const int PixelHeight = 640;
         private Matrix _cameraMatrix = Matrix.Identity;
         private Matrix _projectionMatrix = Matrix.Identity;
-        private double[][] _depthBuffer;
+        private double[] _depthBuffer;
         private Vector3[] _cameraPlanesVectors = new Vector3[]
         {
             new Vector3(0,0,1),
@@ -64,7 +66,10 @@ namespace Rasterizer.Core
             new Vector3(0, 1, 0.5f),
             new Vector3(0, -1, 0.5f)
         };
-
+        const int PxHalf = PixelWidth >> 1;
+        const int PyHalf = PixelHeight >> 1;
+        const float InvPwDv = 1f / (PixelWidth * DistanceOfViewport);
+        const float InvPhDv = 1f / (PixelHeight * DistanceOfViewport);
         private Plane[] _cameraPlanes = new Plane[5];
         public RasterizerGame()
         {
@@ -104,11 +109,7 @@ namespace Rasterizer.Core
             _spriteBatch = new SpriteBatch(GraphicsDevice);
             _pixelTexture = new Texture2D(GraphicsDevice, PixelWidth, PixelHeight);
             _pixelBuffer = new Color[PixelWidth * PixelHeight];
-            _depthBuffer = new double[PixelWidth][];
-            for (int i = 0; i < PixelWidth; i++)
-            {
-                _depthBuffer[i] = new double[PixelHeight];
-            }
+            _depthBuffer = new double[PixelWidth * PixelHeight];
             Models.Add("Cube", new Model(new Vector4[]
             {
                 new Vector4(1,  1,  1, 1),
@@ -141,6 +142,7 @@ namespace Rasterizer.Core
             _lights.Add(new DirectionalLight(0.3,Vector3.Down));
             _lights.Add(new PointLight(0.5,new Vector3(0,2,5)));
             CUBE = new Instance(new Vector4(-1, 2,10, 1), Quaternion.Identity, 1, Models["Cube"], Color.White, 1);
+            CUBE_2 = new Instance(new Vector4(0, -2.5f, 5, 1), Quaternion.Identity, 1, Models["Cube"], Color.White, 1);
         }
 
         /// <summary>
@@ -170,14 +172,15 @@ namespace Rasterizer.Core
                 {
                     int index = y * PixelWidth + x;
                     _pixelBuffer[index] = Color.Black;
-                    _depthBuffer[x][y] = 0;
+                    _depthBuffer[y * PixelWidth + x] = double.MaxValue;
                 }
             }
             float deltaAngle = 0.001f * gameTime.ElapsedGameTime.Milliseconds;
-            Quaternion increment = Quaternion.CreateFromAxisAngle(Vector3.UnitX, deltaAngle);
+            Quaternion increment = Quaternion.CreateFromAxisAngle(new Vector3(1,1,0), deltaAngle);
             CUBE.Rot = Quaternion.Normalize(Quaternion.Concatenate(CUBE.Rot, increment));
             //CUBE.Pos += new Vector4(0, 0, -(float)0.001*gameTime.ElapsedGameTime.Milliseconds, 0);
             RenderInstance(CUBE);
+            RenderInstance(CUBE_2);
             // Apply your rasterization logic / pixel manipulation here
             // ...
             
@@ -208,19 +211,13 @@ namespace Rasterizer.Core
             base.Draw(gameTime);
         }
 
-        public void WriteToPixelWithLight(int x, int y, Color c, Vector3 normal, double specular)
+        public void WriteToPixelWithLight(int x, int y, Color c, float i)
         {
-            int y1 = y + PixelHeight / 2;
-            int x1 = x + PixelWidth / 2;
-            if (y > -1 * PixelHeight / 2 & y < PixelHeight/2 & x > -1 * PixelWidth / 2 & x < PixelWidth/2  )
+            int y1 = y + PyHalf;
+            int x1 = x + PxHalf;
+            if (y is > -1 * PyHalf and < PyHalf && x is > -1 * PxHalf and < PxHalf)
             {
-                Vector3 v = new Vector3((float)(x*ViewportWidth/(PixelWidth*DistanceOfViewport*_depthBuffer[x1][y1])), (float)(y*ViewportHeight/(PixelHeight*DistanceOfViewport*_depthBuffer[x1][y1])), (float)(1/_depthBuffer[x1][y1]));
-                double i = 0;
-                foreach (Light l in _lights)
-                {
-                    i += l.computeLightingOnPoint(v, normal, specular, _cameraPosition, _cameraMatrix);
-                }
-                Color c1 = RasterizerLogic.ScaleColor(c,(float)i);
+                Color c1 = RasterizerLogic.ScaleColor(c,i);
                 _pixelBuffer[y1 * PixelWidth + x1] = c1;
             }
         }
@@ -321,36 +318,64 @@ namespace Rasterizer.Core
                 (pointC, pointB) = (pointB, pointC); 
                 (hs[2], hs[1]) = (hs[1], hs[2]);
             }
+
+            double pointAi = 0;
+            double pointBi = 0;
+            double pointCi = 0;
+            
+            Vector3 v1 = new Vector3((float)(pointA.X*ViewportWidth/(PixelWidth*DistanceOfViewport*hs[0])), (float)(pointA.Y*ViewportHeight/(PixelHeight*DistanceOfViewport*hs[0])), (float)(hs[0]));
+            Vector3 v2 = new Vector3((float)(pointB.X*ViewportWidth/(PixelWidth*DistanceOfViewport*hs[1])), (float)(pointB.Y*ViewportHeight/(PixelHeight*DistanceOfViewport*hs[1])), (float)(hs[2]));
+            Vector3 v3 = new Vector3((float)(pointC.X*ViewportWidth/(PixelWidth*DistanceOfViewport*hs[2])), (float)(pointC.Y*ViewportHeight/(PixelHeight*DistanceOfViewport*hs[2])), (float)(hs[1]));
+            
+            foreach (Light l in _lights)
+            {
+                pointAi += l.computeLightingOnPoint(v1, normal, instance.Specular, _cameraPosition, _cameraMatrix);
+                pointBi += l.computeLightingOnPoint(v2, normal, instance.Specular, _cameraPosition, _cameraMatrix);
+                pointCi += l.computeLightingOnPoint(v3, normal, instance.Specular, _cameraPosition, _cameraMatrix);
+            }
+            
+            
             double[] values01 = RasterizerLogic.Interpolate(pointA.Y, pointA.X, pointB.Y, pointB.X).SkipLast(1).ToArray();
             double[] hValues01 = RasterizerLogic.Interpolate(pointA.Y, hs[0], pointB.Y, hs[1]).SkipLast(1).ToArray();
+            double[] iValues01 = RasterizerLogic.Interpolate(pointA.Y, pointAi, pointB.Y, pointBi).SkipLast(1)
+                .ToArray();
             
             double[] values12 = RasterizerLogic.Interpolate(pointB.Y, pointB.X, pointC.Y, pointC.X);
             double[] hValues12 = RasterizerLogic.Interpolate(pointB.Y, hs[1], pointC.Y, hs[2]);
+            double[] iValues12 = RasterizerLogic.Interpolate(pointB.Y, pointBi, pointC.Y, pointCi);
             
             double[] values02 = RasterizerLogic.Interpolate(pointA.Y, pointA.X, pointC.Y, pointC.X);
             double[] hValues02 = RasterizerLogic.Interpolate(pointA.Y, hs[0], pointC.Y, hs[2]);
+            double[] iValues02 = RasterizerLogic.Interpolate(pointA.Y, pointAi, pointC.Y, pointCi);
             
             double[] values012 = values01.Concat(values12).ToArray();
             double[] hValues012 = hValues01.Concat(hValues12).ToArray();
+            double[] iValues012 = iValues01.Concat(iValues12).ToArray();
             
             int m = (int)Math.Floor((double)values02.Length / 2);
             double[] xLeft;
             double[] hLeft;
+            double[] iLeft;
             double[] xRight;
             double[] hRight;
+            double[] iRight;
             if (values02[m] < values012[m])
             {
                 xLeft = values02;
                 hLeft = hValues02;
+                iLeft = iValues02;
                 xRight = values012;
                 hRight = hValues012;
+                iRight = iValues012;
             }
             else
             {
                 xLeft = values012;
                 hLeft = hValues012;
+                iLeft = iValues012;
                 xRight = values02;
                 hRight = hValues02;
+                iRight = iValues02;
             }
             int yMin = (int)Math.Ceiling(pointA.Y);
             int yMax = (int)Math.Floor (pointC.Y);
@@ -364,15 +389,15 @@ namespace Rasterizer.Core
                 double[] hSegment = RasterizerLogic.Interpolate(
                     xLeft [yIndex],  hLeft [yIndex],
                     xRight[yIndex],  hRight[yIndex]);
-
+                double[] iSegment = RasterizerLogic.Interpolate(xLeft[yIndex], iLeft[yIndex],xRight[yIndex],iRight[yIndex]);
                 /* integer span of the current scan line, inclusive */
                 int xl = (int)Math.Ceiling(xLeft [yIndex]);
                 int xr = (int)Math.Floor (xRight[yIndex]);
 
                 for (int x = xl; x <= xr; ++x)                         // inclusive
                 {
-                    double z = 1.0 / hSegment[x - xl];
-
+                    double z = hSegment[x - xl];
+                    double i = iSegment[x - xl];
                     /* clip against the render target */
                     if (y > -PixelHeight / 2 && y < PixelHeight / 2 &&
                         x > -PixelWidth  / 2 && x < PixelWidth  / 2)
@@ -381,10 +406,10 @@ namespace Rasterizer.Core
                         int bufY = y + PixelHeight / 2;
 
                         /* depth test */
-                        if (z > _depthBuffer[bufX][bufY])
+                        if (z < _depthBuffer[bufY * PixelWidth + bufX])
                         {
-                            _depthBuffer[bufX][bufY] = z;
-                            WriteToPixelWithLight(x, y, c, normal, instance.Specular);
+                            _depthBuffer[bufY * PixelWidth + bufX] = z;
+                            WriteToPixelWithLight(x, y, c, (float)i);
                         }
                     }
                 }

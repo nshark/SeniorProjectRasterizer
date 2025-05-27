@@ -23,7 +23,7 @@ public class PointLight : Light
             i += Intensity * nDotL/(normal.Length() * direction.Length());
         }
 
-        if (RasterizerLogic.EpsilonCompare(specular, -1))
+        if (Math.Abs(specular + 1) < RasterizerLogic.Epsilon)
         {
             Vector3 r = Vector3.Reflect(direction, normal);
             float rDotV = Vector3.Dot(r, v);

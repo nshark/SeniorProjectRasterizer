@@ -75,4 +75,11 @@ public static class RasterizerLogic
 
         return new Color(r, g, b, a);
     }
+    public static Vector3 QuaternionToEuler(Quaternion q)
+    {
+        float y = (float)Math.Atan2(2 * (q.X * q.Y + q.Z * q.W), 1 - 2 * (q.Y * q.Y + q.Z * q.Z));
+        float x = (float)Math.Asin(2 * (q.X * q.Z - q.W * q.Y));
+        float z = (float)Math.Atan2(2 * (q.X * q.W + q.Y * q.Z), 1 - 2 * (q.X * q.X + q.Z * q.Z));
+        return new Vector3(x, y, z);
+    }
 }

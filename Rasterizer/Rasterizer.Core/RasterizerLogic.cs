@@ -7,7 +7,7 @@ namespace Rasterizer.Core;
 public static class RasterizerLogic
 {
     public const double Epsilon = 0.0001;
-    public static double[] Interpolate(double i0, double d0, double i1, double d1)
+    public static double[] Interpolate(double i0, double d0, double i1, double d1, bool logging = false)
     {
         int o0 = (int)Math.Floor(i0);
         int o1 = (int)Math.Ceiling(i1);
@@ -24,7 +24,20 @@ public static class RasterizerLogic
         for (int i = o0; i <= o1; i++)
         {
             values[i - o0] = d;
+            if (logging)
+            {
+                Console.WriteLine("i:" + i + " d:" + d);
+            }
             d += a;
+            if (d > d1 && a > 0)
+            {
+                d = d1;
+            }
+
+            if (d < d1 && a < 0)
+            {
+                d = d1;
+            }
         }
 
         values[^1] = d1;
@@ -50,28 +63,22 @@ public static class RasterizerLogic
     }
     public static Vector3 ComputeNormal(Vector3 v1, Vector3 v2, Vector3 v3)
     {
-        // Calculate the two edge vectors
         Vector3 edge1 = v2 - v1;
         Vector3 edge2 = v3 - v1;
 
-        // Calculate the cross product of the two edges
         Vector3 crossProduct = Vector3.Cross(edge1, edge2);
-
-        // Normalize the resulting vector to ensure it is a unit vector
         Vector3 normal = Vector3.Normalize(crossProduct);
 
         return normal;
     }
     public static Color ScaleColor(Color color, float intensity)
     {
-        // Ensure intensity is clamped between 0 and 1
         intensity = MathHelper.Clamp(intensity, 0.0f, 1.0f);
-
-        // Scale each component by the intensity
+        
         byte r = (byte)(color.R * intensity);
         byte g = (byte)(color.G * intensity);
         byte b = (byte)(color.B * intensity);
-        byte a = color.A; // You might or might not want to scale alpha
+        byte a = color.A; 
 
         return new Color(r, g, b, a);
     }

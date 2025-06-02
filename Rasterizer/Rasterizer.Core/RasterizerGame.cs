@@ -9,7 +9,11 @@ using Quaternion = Microsoft.Xna.Framework.Quaternion;
 using Vector2 = Microsoft.Xna.Framework.Vector2;
 using Vector4 = Microsoft.Xna.Framework.Vector4;
 
+
+
 namespace Rasterizer.Core;
+
+internal enum GameMode { SelectingObj, Running }
 
 /// <summary>
 ///     The main class for the game, responsible for managing game components, settings,
@@ -17,6 +21,11 @@ namespace Rasterizer.Core;
 /// </summary>
 public class RasterizerGame : Game
 {
+    public static bool activateLog = false;
+    private GameMode _mode = GameMode.SelectingObj;
+    private SelectionMenu _menu;
+    private SpriteFont _font;
+    private string? _currentObjPath;
     private const float MouseSensitivity = 0.0025f;
     private const float ViewportWidth = 1;
     private const float DistanceOfViewport = 1;
@@ -25,17 +34,13 @@ public class RasterizerGame : Game
     private const int PixelHeight = 640;
     private const int PxHalf = PixelWidth >> 1;
     private const int PyHalf = PixelHeight >> 1;
+    private bool _menuKeyWasDown;
     private const float InvPwDv = 1f / (PixelWidth * DistanceOfViewport);
     private const float InvPhDv = 1f / (PixelHeight * DistanceOfViewport);
+    private Instance _curInstance;
 
-    /// <summary>
-    ///     Indicates if the game is running on a mobile platform.
-    /// </summary>
     public static readonly bool IsMobile = OperatingSystem.IsAndroid() || OperatingSystem.IsIOS();
 
-    /// <summary>
-    ///     Indicates if the game is running on a desktop platform.
-    /// </summary>
     public static readonly bool IsDesktop =
         OperatingSystem.IsMacOS() || OperatingSystem.IsLinux() || OperatingSystem.IsWindows();
 
@@ -51,56 +56,38 @@ public class RasterizerGame : Game
         new(0, -1, 0.5f)
     };
 
-    private Vector4 _cameraPosition = new(0, 0, 0, 1);
+    private Vector4 _cameraPosition = new(0, 0, -15, 1);
     
-    // ----------  FIELDS  -------------------------------------------------
+
     private Quaternion _cameraRotation = Quaternion.Identity;
     private double[] _depthBuffer;
 
-    /// <summary>
-    ///     Initializes a new instance of the game. Configures platform-specific settings,
-    ///     initializes services like settings and leaderboard managers, and sets up the
-    ///     screen manager for screen transitions.
-    /// </summary>
     private readonly List<Light> _lights = new();
 
     private Color[] _pixelBuffer;
     private Texture2D _pixelTexture;
     private Matrix _projectionMatrix = Matrix.Identity;
     private SpriteBatch _spriteBatch;
-    private Point _windowCentre; // cached centre of the window
-
-    // new – mouse-look bookkeeping
-    private float _yaw, _pitch; // accumulated angles
-    // Resources for drawing.
-
-    private Instance _cat;
-    private Instance _lion;
+    private Point _windowCentre; 
+    
+    private float _yaw, _pitch; 
+    
     private readonly GraphicsDeviceManager graphicsDeviceManager;
-    // --------------------------------------------------------------------
-
-    public Dictionary<string, Model> Models = new();
-
+    
     public RasterizerGame()
     {
         graphicsDeviceManager = new GraphicsDeviceManager(this);
 
-        // Share GraphicsDeviceManager as a service.
         Services.AddService(typeof(GraphicsDeviceManager), graphicsDeviceManager);
 
         Content.RootDirectory = "Content";
 
-        // Configure screen orientations.
         graphicsDeviceManager.SupportedOrientations =
             DisplayOrientation.LandscapeLeft | DisplayOrientation.LandscapeRight;
         graphicsDeviceManager.PreferredBackBufferHeight = PixelHeight;
         graphicsDeviceManager.PreferredBackBufferWidth = PixelWidth;
     }
 
-    /// <summary>
-    ///     Initializes the game, including setting up localization and adding the
-    ///     initial screens to the ScreenManager.
-    /// </summary>
     protected override void LoadContent()
     {
         base.LoadContent();
@@ -117,35 +104,6 @@ public class RasterizerGame : Game
         _pixelTexture = new Texture2D(GraphicsDevice, PixelWidth, PixelHeight);
         _pixelBuffer = new Color[PixelWidth * PixelHeight];
         _depthBuffer = new double[PixelWidth * PixelHeight];
-        Models.Add("Cube", new Model(new Vector4[]
-        {
-            new(1, 1, 1, 1),
-            new(-1, 1, 1, 1),
-            new(-1, -1, 1, 1),
-            new(1, -1, 1, 1),
-            new(1, 1, -1, 1),
-            new(-1, 1, -1, 1),
-            new(-1, -1, -1, 1),
-            new(1, -1, -1, 1)
-        }, new int[][]
-        {
-            [0, 1, 2],
-            [0, 2, 3],
-            [4, 0, 3],
-            [4, 3, 7],
-            [5, 4, 7],
-            [5, 7, 6],
-            [1, 5, 6],
-            [1, 6, 2],
-            [4, 5, 1],
-            [4, 1, 0],
-            [2, 6, 7],
-            [2, 7, 3]
-        }, double.Sqrt(2)));
-        Models.Add("Cat", Model.FromOBJ("/Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.Core/objs/cat.obj"));
-        Models.Add("Lion", Model.FromOBJ("/Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.Core/objs/lion.obj"));
-        _cat = new Instance(new Vector4(0, 20, 60, 1), Quaternion.CreateFromYawPitchRoll(0,Single.Pi/2,0), 1, Models["Cat"], Color.White, 1);
-        _lion = new Instance(new Vector4(0,0,-60,1), Quaternion.Identity,1, Models["Lion"], Color.White, 1);
         _projectionMatrix[0, 0] = DistanceOfViewport * PixelWidth / ViewportWidth;
         _projectionMatrix[1, 1] = DistanceOfViewport * PixelHeight / ViewportHeight;
         _projectionMatrix[3, 3] = 0;
@@ -154,31 +112,48 @@ public class RasterizerGame : Game
         _lights.Add(new PointLight(0.5, new Vector3(0, 2, 5))); 
         _windowCentre = new Point(PixelWidth / 2, PixelHeight / 2);
         IsMouseVisible = false;
+        _font = Content.Load<SpriteFont>("Fonts/Hud");
+        _menu = new SelectionMenu(GraphicsDevice, _font, "/Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.Core/objs");
+        _menu.Open();
+        
         Mouse.SetPosition(_windowCentre.X, _windowCentre.Y);
     }
-
-    /// <summary>
-    ///     Loads game content, such as textures and particle systems.
-    /// </summary>
-    /// <summary>
-    ///     Updates the game's logic, called once per frame.
-    /// </summary>
-    /// <param name="gameTime">
-    ///     Provides a snapshot of timing values used for game updates.
-    /// </param>
-    // ----------  Update()  ----------------------------------------------
     protected override void Update(GameTime gameTime)
     {
-        // bail-out key
+        if (Keyboard.GetState().IsKeyDown(Keys.Space))
+        {
+            activateLog = true;
+        }
         if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed ||
             Keyboard.GetState().IsKeyDown(Keys.Escape))
             Exit();
 
         float dtMs = gameTime.ElapsedGameTime.Milliseconds;
+        if (_mode == GameMode.SelectingObj)
+        {
+            _menu.Update(gameTime);
 
-        /* ------------------------------------------
-         * 1)  mouse-look
-         * ----------------------------------------*/
+            if (_menu.HasSelection)
+            {
+                _currentObjPath = _menu.SelectedPath;
+                _curInstance = new Instance(new Vector4(0,0,0,1),Quaternion.Identity, 1,Model.FromOBJ(_currentObjPath),Color.White,1);          // <-- YOU IMPLEMENT THIS
+                _mode = GameMode.Running;
+            }
+            else if (!_menu.IsOpen)                
+            {
+                _menu.Open();                      
+            }
+            return;                                
+        }
+        KeyboardState k = Keyboard.GetState();
+        if (k.IsKeyDown(Keys.M) && !_menuKeyWasDown)
+        {
+            _mode = GameMode.SelectingObj;
+            _menu.Open();
+            _menuKeyWasDown = true;
+            return;
+        }
+        _menuKeyWasDown = k.IsKeyDown(Keys.M);
         var m = Mouse.GetState();
         var dx = m.X - _windowCentre.X;
         var dy = m.Y - _windowCentre.Y;
@@ -219,14 +194,10 @@ public class RasterizerGame : Game
         if (move.LengthSquared() > 0)
         {
             move.Normalize();
-            move = Vector3.Transform(move, _cameraRotation); // camera → world
-            var speed = 0.05f * dtMs; // tweak to taste
+            move = Vector3.Transform(move, _cameraRotation);
+            var speed = 0.01f * dtMs; 
             _cameraPosition += new Vector4(move * speed, 0f);
         }
-
-        /* ------------------------------------------
-         * 3)  view matrix
-         * ----------------------------------------*/
         Vector3 camPos = new Vector3(_cameraPosition.X,
             _cameraPosition.Y,
             _cameraPosition.Z);
@@ -235,13 +206,6 @@ public class RasterizerGame : Game
         Vector3 camUp = Vector3.Transform(Vector3.Up, _cameraRotation);
 
         _cameraMatrix = Matrix.CreateLookAt(camPos, camPos + camForward, camUp);
-
-        /* ------------------------------------------
-         * 4)  the rest of your original Update()
-         * ----------------------------------------*/
-        // clear colour/depth buffers, call RenderInstance, etc.
-        // (everything that was below can remain unchanged)
-        // ---------------------------------------------------
         for (var y = 0; y < PixelHeight; y++)
         for (var x = 0; x < PixelWidth; x++)
         {
@@ -250,25 +214,26 @@ public class RasterizerGame : Game
             _depthBuffer[idx] = double.MaxValue;
         }
 
-        RenderInstance(_cat);
-        //RenderInstance(_lion);
+        if (_curInstance != null)
+        {
+            RenderInstance(_curInstance);
+        }
         _pixelTexture.SetData(_pixelBuffer);
         base.Update(gameTime);
     }
 
-    /// <summary>
-    ///     Draws the game's graphics, called once per frame.
-    /// </summary>
-    /// <param name="gameTime">
-    ///     Provides a snapshot of timing values used for rendering.
-    /// </param>
     protected override void Draw(GameTime gameTime)
     {
+        if (_mode == GameMode.SelectingObj)
+        {
+            GraphicsDevice.Clear(Color.CornflowerBlue);
+            _menu.Draw(_spriteBatch);
+            return;
+        }
         GraphicsDevice.Clear(Color.Black);
-
+        
         _spriteBatch.Begin();
-
-        // Display at original size or scale up to desired resolution
+        
         _spriteBatch.Draw(_pixelTexture, new Rectangle(0, 0, PixelWidth, PixelHeight), Color.White);
 
         _spriteBatch.End();
@@ -388,12 +353,12 @@ public class RasterizerGame : Game
         }
 
 
-        var values01 = RasterizerLogic.Interpolate(pointA.Y, pointA.X, pointB.Y, pointB.X).SkipLast(1).ToArray();
+        var values01 = RasterizerLogic.Interpolate(pointA.Y, pointA.X, pointB.Y, pointB.X, activateLog).SkipLast(1).ToArray();
         var hValues01 = RasterizerLogic.Interpolate(pointA.Y, hs[0], pointB.Y, hs[1]).SkipLast(1).ToArray();
         var iValues01 = RasterizerLogic.Interpolate(pointA.Y, pointAi, pointB.Y, pointBi).SkipLast(1)
             .ToArray();
 
-        var values12 = RasterizerLogic.Interpolate(pointB.Y, pointB.X, pointC.Y, pointC.X);
+        var values12 = RasterizerLogic.Interpolate(pointB.Y, pointB.X, pointC.Y, pointC.X, activateLog);
         var hValues12 = RasterizerLogic.Interpolate(pointB.Y, hs[1], pointC.Y, hs[2]);
         var iValues12 = RasterizerLogic.Interpolate(pointB.Y, pointBi, pointC.Y, pointCi);
 
@@ -404,7 +369,7 @@ public class RasterizerGame : Game
         var values012 = values01.Concat(values12).ToArray();
         var hValues012 = hValues01.Concat(hValues12).ToArray();
         var iValues012 = iValues01.Concat(iValues12).ToArray();
-
+        
         var m = (int)Math.Floor((double)values02.Length / 2);
         double[] xLeft;
         double[] hLeft;
@@ -430,36 +395,34 @@ public class RasterizerGame : Game
             hRight = hValues02;
             iRight = iValues02;
         }
-
+        
         var yMin = (int)Math.Ceiling(pointA.Y);
         var yMax = (int)Math.Floor(pointC.Y);
 
-        for (var y = yMin; y <= yMax; ++y) // inclusive
+        for (var y = yMin; y <= yMax; ++y)
         {
-            /* index into the pre-computed edge arrays */
             var yIndex = y - (int)Math.Round(pointA.Y);
 
-            /* 1/w values for this scan line (needed for the depth test) */
             var hSegment = RasterizerLogic.Interpolate(
                 xLeft[yIndex], hLeft[yIndex],
                 xRight[yIndex], hRight[yIndex]);
             var iSegment = RasterizerLogic.Interpolate(xLeft[yIndex], iLeft[yIndex], xRight[yIndex], iRight[yIndex]);
-            /* integer span of the current scan line, inclusive */
+            
             var xl = (int)Math.Ceiling(xLeft[yIndex]);
             var xr = (int)Math.Floor(xRight[yIndex]);
 
-            for (var x = xl; x <= xr; ++x) // inclusive
+            for (var x = xl; x <= xr; ++x) 
             {
                 var z = hSegment[x - xl];
                 var i = iSegment[x - xl];
-                /* clip against the render target */
+                
                 if (y > -PixelHeight / 2 && y < PixelHeight / 2 &&
                     x > -PixelWidth / 2 && x < PixelWidth / 2)
                 {
                     var bufX = x + PixelWidth / 2;
                     var bufY = y + PixelHeight / 2;
 
-                    /* depth test */
+                    
                     if (z < _depthBuffer[bufY * PixelWidth + bufX])
                     {
                         _depthBuffer[bufY * PixelWidth + bufX] = z;

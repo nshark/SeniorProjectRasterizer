@@ -6,20 +6,11 @@ namespace Rasterizer.Core;
 
 public static class PolygonTriangulator
 {
-    /// <summary>
-    /// Triangulate a simple polygon.
-    /// 
-    /// vertices      – world or model-space points (only X,Y are used)
-    /// polyIndices   – indices that walk once around the polygon
-    /// 
-    /// Result: List<int[3]>  (each int[ ] is {i0,i1,i2})
-    /// </summary>
     public static List<int[]> Triangulate(IList<Vector4> vertices, IList<int> polyIndices)
     {
         if (vertices   == null) throw new ArgumentNullException(nameof(vertices));
         if (polyIndices == null) throw new ArgumentNullException(nameof(polyIndices));
-
-        /* ---- build a clean working copy of the ring ------------------- */
+        
         var loop = new List<int>(polyIndices.Count);
         foreach (var i in polyIndices)
         {
@@ -34,7 +25,6 @@ public static class PolygonTriangulator
 
         bool ccw = SignedArea(remaining, vertices) > 0f;
 
-        /* ---------------- main ear-clipping loop ----------------------- */
         int watchdog = 0;
         while (remaining.Count > 3 && watchdog++ < 2048)
         {
@@ -63,7 +53,6 @@ public static class PolygonTriangulator
                 }
                 if (containsOther) continue;
 
-                /* --- clip this ear --- */
                 triangles.Add(new[] { ia, ib, ic });
                 remaining.RemoveAt(i);
                 earFound = true;
@@ -74,8 +63,7 @@ public static class PolygonTriangulator
                 throw new InvalidOperationException(
                     "Could not find an ear – polygon is probably self-intersecting or degenerate");
         }
-
-        /* last triangle */
+        
         if (remaining.Count == 3)
             triangles.Add(new[] { remaining[0], remaining[1], remaining[2] });
 

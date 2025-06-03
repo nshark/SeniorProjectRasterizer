@@ -24,10 +24,6 @@ public static class RasterizerLogic
         for (int i = o0; i <= o1; i++)
         {
             values[i - o0] = d;
-            if (logging)
-            {
-                Console.WriteLine("i:" + i + " d:" + d);
-            }
             d += a;
             if (d > d1 && a > 0)
             {

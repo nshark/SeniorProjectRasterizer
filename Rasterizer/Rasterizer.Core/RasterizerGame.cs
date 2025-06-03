@@ -113,13 +113,18 @@ public class RasterizerGame : Game
         _windowCentre = new Point(PixelWidth / 2, PixelHeight / 2);
         IsMouseVisible = false;
         _font = Content.Load<SpriteFont>("Fonts/Hud");
-        _menu = new SelectionMenu(GraphicsDevice, _font, "/Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.Core/objs");
+        _menu = new SelectionMenu(GraphicsDevice, _font, "/Users/noah/RiderProjects/Rasterizer/Rasterizer/Rasterizer.Core/objs", Window);
         _menu.Open();
         
         Mouse.SetPosition(_windowCentre.X, _windowCentre.Y);
     }
     protected override void Update(GameTime gameTime)
     {
+        if (Keyboard.GetState().IsKeyDown(Keys.T) || GamePad.GetState(PlayerIndex.One).IsButtonDown(Buttons.X))
+        {
+            _cameraPosition = new(0, 0, -15, 1);
+            _cameraRotation = Quaternion.Identity;
+        }
         if (Keyboard.GetState().IsKeyDown(Keys.Space))
         {
             activateLog = true;
@@ -146,14 +151,14 @@ public class RasterizerGame : Game
             return;                                
         }
         KeyboardState k = Keyboard.GetState();
-        if (k.IsKeyDown(Keys.M) && !_menuKeyWasDown)
+        if ((k.IsKeyDown(Keys.M) || GamePad.GetState(PlayerIndex.One).IsButtonDown(Buttons.A)) && !_menuKeyWasDown)
         {
             _mode = GameMode.SelectingObj;
             _menu.Open();
             _menuKeyWasDown = true;
             return;
         }
-        _menuKeyWasDown = k.IsKeyDown(Keys.M);
+        _menuKeyWasDown = k.IsKeyDown(Keys.M) || GamePad.GetState(PlayerIndex.One).IsButtonDown(Buttons.A);
         var m = Mouse.GetState();
         var dx = m.X - _windowCentre.X;
         var dy = m.Y - _windowCentre.Y;
